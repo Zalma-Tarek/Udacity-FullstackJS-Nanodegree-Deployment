@@ -66,7 +66,9 @@ jobs:
       - run:
           name: Install Elastic Beanstalk CLI
           command: |
-            pip install --user awsebcli 
+            sudo apt-get update
+            sudo apt-get install -y python3-pip
+            pip3 install --user awsebcli
             echo 'export PATH=$PATH:$HOME/.local/bin' >> $BASH_ENV
       # Send secrets from CircleCI to Elastic Beanstalk
       - run:
