@@ -27,7 +27,7 @@ jobs:
             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID --profile swaves
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
             aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
-            aws configure set region us-east-1 --profile swaves
+            aws configure set region $AWS_REGION --profile swaves
       # Upload frontend build to S3    
       - run:
           name: Deploy Frontend
@@ -62,25 +62,19 @@ jobs:
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
             aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
             aws configure set region us-east-1 --profile swaves
-      #Install EB CLI
-      - run:
-          name: Install Elastic Beanstalk CLI
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y python3-pip
-            pip3 install --user awsebcli
-            echo 'export PATH=$PATH:$HOME/.local/bin' >> $BASH_ENV
       # Send secrets from CircleCI to Elastic Beanstalk
       - run:
-          name: Set Elastic Beanstalk Environment Variables
-          command: |
-            eb setenv \
-              POSTGRES_USERNAME=$POSTGRES_USERNAME \
-              POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
-              POSTGRES_DB=$POSTGRES_DB \
-              POSTGRES_HOST=$POSTGRES_HOST \
-              JWT_SECRET=$JWT_SECRET \
-              AWS_REGION=$AWS_REGION
+    name: Set Elastic Beanstalk Environment Variables
+    command: |
+      aws elasticbeanstalk update-environment \
+        --environment-name Demo-app-env \
+        --option-settings \
+          Namespace=aws:elasticbeanstalk:application:environment,OptionName=POSTGRES_USERNAME,Value=$POSTGRES_USERNAME \
+          Namespace=aws:elasticbeanstalk:application:environment,OptionName=POSTGRES_PASSWORD,Value=$POSTGRES_PASSWORD \
+          Namespace=aws:elasticbeanstalk:application:environment,OptionName=POSTGRES_DB,Value=$POSTGRES_DB \
+          Namespace=aws:elasticbeanstalk:application:environment,OptionName=POSTGRES_HOST,Value=$POSTGRES_HOST \
+          Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_SECRET,Value=$JWT_SECRET \
+        --profile swaves
       # Deploy backend to Elastic Beanstalk
       - run:
           name: Deploy Server
