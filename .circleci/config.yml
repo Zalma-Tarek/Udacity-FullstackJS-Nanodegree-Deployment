@@ -1,20 +1,26 @@
 version: 2.1
+# Reusable CircleCI orbs for Node.js and AWS CLI
 orbs:
   node: circleci/node@4.2.0
   aws-cli: circleci/aws-cli@2.0.0
 jobs:
+# Frontend build and deployment job
   frontend:
     working_directory: ~/app/udagram-frontend
     executor: node/default
     steps:
       - checkout:
           path: ~/app
+      # Install frontend dependencies
       - node/install-packages:
           app-dir: ~/app/udagram-frontend
+      # Build Angular frontend
       - run:
           name: Build Frontend
           command: npm run build
+      # Install AWS CLI to deploy frontend
       - aws-cli/install
+      # Configure AWS credentials from CircleCI environment variables
       - run:
           name: Configure AWS Profile
           command: |
@@ -22,28 +28,33 @@ jobs:
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
             aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
             aws configure set region us-east-1 --profile swaves
-          
+      # Upload frontend build to S3    
       - run:
           name: Deploy Frontend
           command: |
             aws s3 cp --recursive ./www s3://frontend-udacity-bucket765354364542 --profile swaves
+  # Backend API build and deployment job
   server:
     working_directory: ~/app/udagram-api
     executor: node/default
     steps:
       - checkout:
           path: ~/app
+      # Install backend dependencies
       - run:
           name: Install NPM packages
           command: npm install
           working_directory: ~/app/udagram-api
+      # Build backend and create deployable archive
       - run:
           name: Build and Archive Server
           command: |-
             npm run build
             printenv > www/.env
             zip -r www/Archive.zip www
+      # Install AWS CLI for backend deployment
       - aws-cli/install
+      # Configure AWS credentials securely
       - run:
           name: Configure AWS Profile
           command: |
@@ -51,6 +62,18 @@ jobs:
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
             aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
             aws configure set region us-east-1 --profile swaves
+      # Send secrets from CircleCI to Elastic Beanstalk
+      - run:
+          name: Set Elastic Beanstalk Environment Variables
+          command: |
+            eb setenv \
+              POSTGRES_USERNAME=$POSTGRES_USERNAME \
+              POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+              POSTGRES_DB=$POSTGRES_DB \
+              POSTGRES_HOST=$POSTGRES_HOST \
+              JWT_SECRET=$JWT_SECRET \
+              AWS_REGION=$AWS_REGION
+      # Deploy backend to Elastic Beanstalk
       - run:
           name: Deploy Server
           command: |-        
@@ -61,5 +84,13 @@ jobs:
 workflows:
   build_and_deploy:
     jobs:
-      - frontend
-      - server
+      - frontend:
+          filters:
+            branches:
+              only:
+                - main
+      - server:
+          filters:
+            branches:
+              only:
+                - main
