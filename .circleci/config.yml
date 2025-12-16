@@ -62,6 +62,12 @@ jobs:
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
             aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
             aws configure set region us-east-1 --profile swaves
+      #Install EB CLI
+      - run:
+          name: Install Elastic Beanstalk CLI
+          command: |
+            pip install --user awsebcli 
+            echo 'export PATH=$PATH:$HOME/.local/bin' >> $BASH_ENV
       # Send secrets from CircleCI to Elastic Beanstalk
       - run:
           name: Set Elastic Beanstalk Environment Variables
