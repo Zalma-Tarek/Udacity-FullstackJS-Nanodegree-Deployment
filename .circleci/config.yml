@@ -1,78 +1,65 @@
 version: 2.1
 orbs:
-  # orgs contain basc recipes and reproducible actions (install node, aws, etc.)
-  node: circleci/node@5.0.2
-  eb: circleci/aws-elastic-beanstalk@2.0.1
-  aws-cli: circleci/aws-cli@3.1.1
-  # different jobs are calles later in the workflows sections
+  node: circleci/node@4.2.0
+  aws-cli: circleci/aws-cli@2.0.0
 jobs:
-  build:
-    docker:
-      # the base image can run most needed actions with orbs
-      - image: "cimg/node:14.15"
+  frontend:
+    working_directory: ~/app/udagram-frontend
+    executor: node/default
     steps:
-      # install node and checkout code
-      - node/install:
-          node-version: '14.15'         
-      - checkout
-      # Use root level package.json to install dependencies in the frontend app
+      - checkout:
+          path: ~/app
+      - node/install-packages:
+          app-dir: ~/app/udagram-frontend
       - run:
-          name: Install Front-End Dependencies
-          command: |
-            echo "NODE --version" 
-            echo $(node --version)
-            echo "NPM --version" 
-            echo $(npm --version)
-            npm run frontend:install
-      # TODO: Install dependencies in the the backend API          
+          name: Build Frontend
+          command: npm run build
+      - aws-cli/install
       - run:
-          name: Install API Dependencies
+          name: Configure AWS Profile
           command: |
-           echo "TODO: Install dependencies in the the backend API  "
-      # TODO: Lint the frontend
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID --profile swaves
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
+            aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
+            aws configure set region us-east-1 --profile swaves
+          
       - run:
-          name: Front-End Lint
+          name: Deploy Frontend
           command: |
-            echo "TODO: Lint the frontend"
-      # TODO: Build the frontend app
-      - run:
-          name: Front-End Build
-          command: |
-            echo "TODO: Build the frontend app"
-      # TODO: Build the backend API      
-      - run:
-          name: API Build
-          command: |
-            echo "TODO: Build the backend API"
-  # deploy step will run only after manual approval
-  deploy:
-    docker:
-      - image: "cimg/base:stable"
-      # more setup needed for aws, node, elastic beanstalk
+            aws s3 cp --recursive ./www s3://frontend-udacity-bucket765354364542 --profile swaves
+  server:
+    working_directory: ~/app/udagram-api
+    executor: node/default
     steps:
-      - node/install:
-          node-version: '14.15' 
-      - eb/setup
-      - aws-cli/setup
-      - checkout
+      - checkout:
+          path: ~/app
       - run:
-          name: Deploy App
-          # TODO: Install, build, deploy in both apps
+          name: Install NPM packages
+          command: npm install
+          working_directory: ~/app/udagram-api
+      - run:
+          name: Build and Archive Server
+          command: |-
+            npm run build
+            printenv > www/.env
+            zip -r www/Archive.zip www
+      - aws-cli/install
+      - run:
+          name: Configure AWS Profile
           command: |
-            echo "# TODO: Install, build, deploy in both apps"
-            
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID --profile swaves
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
+            aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
+            aws configure set region us-east-1 --profile swaves
+      - run:
+          name: Deploy Server
+          command: |-        
+            aws s3 cp ./www/Archive.zip s3://frontend-udacity-bucket765354364542/Archive.zip --profile swaves
+            aws elasticbeanstalk create-application-version --application-name demo-app --version-label <<pipeline.git.revision>> --source-bundle S3Bucket="frontend-udacity-bucket765354364542",S3Key="Archive.zip" --profile swaves
+            aws elasticbeanstalk update-environment --application-name demo-app --environment-name Demo-app-env --version-label <<pipeline.git.revision>> --profile swaves
+
 workflows:
-  udagram:
+  build_and_deploy:
     jobs:
-      - build
-      - hold:
-          filters:
-            branches:
-              only:
-                - master
-          type: approval
-          requires:
-            - build
-      - deploy:
-          requires:
-            - hold
+      - frontend
+      - server
