@@ -61,7 +61,7 @@ jobs:
             aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID --profile swaves
             aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile swaves
             aws configure set aws_session_token $AWS_SESSION_TOKEN --profile swaves
-            aws configure set region us-east-1 --profile swaves
+            aws configure set region $AWS_REGION --profile swaves
       # Send secrets from CircleCI to Elastic Beanstalk
       - run:
           name: Set Elastic Beanstalk Environment Variables
@@ -75,6 +75,8 @@ jobs:
                 Namespace=aws:elasticbeanstalk:application:environment,OptionName=POSTGRES_HOST,Value=$POSTGRES_HOST \
                 Namespace=aws:elasticbeanstalk:application:environment,OptionName=JWT_SECRET,Value=$JWT_SECRET \
               --profile swaves
+      
+            aws elasticbeanstalk wait environment-updated --application-name demo-app --environment-names Demo-app-env --profile swaves
       # Deploy backend to Elastic Beanstalk
       - run:
           name: Deploy Server
